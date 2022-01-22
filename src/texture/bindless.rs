@@ -74,35 +74,40 @@ use crate::uniforms::UniformBlock;
 use crate::uniforms::UniformValue;
 use crate::uniforms::UniformType;
 use crate::uniforms::SamplerBehavior;
+use crate::sampler_object;
 
 /// A texture that is resident in video memory. This allows you to use bindless textures in your
 /// shaders.
 pub struct ResidentTexture {
     texture: Option<TextureAny>,
     handle: gl::types::GLuint64,
+    sampler: sampler_object::SamplerObject,
 }
 
 impl ResidentTexture {
     /// Takes ownership of the given texture and makes it resident.
     // TODO: sampler
-    pub fn new(texture: TextureAny) -> Result<ResidentTexture, BindlessTexturesNotSupportedError> {
-        let handle = {
+    pub fn new(texture: TextureAny, sb: &SamplerBehavior) -> Result<ResidentTexture, BindlessTexturesNotSupportedError> {
+        let (handle, sampler) = {
             let mut ctxt = texture.get_context().make_current();
 
             if !ctxt.extensions.gl_arb_bindless_texture {
                 return Err(BindlessTexturesNotSupportedError);
             }
 
-            let handle = unsafe { ctxt.gl.GetTextureHandleARB(texture.get_id()) };
+            let sampler = sampler_object::SamplerObject::new(&mut ctxt, sb);
+            let handle = unsafe { ctxt.gl.GetTextureSamplerHandleARB(texture.get_id(), sampler.get_id()) };
+            unsafe { assert_eq!(ctxt.gl.GetError(), gl::NO_ERROR) };
             unsafe { ctxt.gl.MakeTextureHandleResidentARB(handle) };
             ctxt.resident_texture_handles.push(handle);
-            handle
+            (handle, sampler)
         };
 
         // store the handle in the context
         Ok(ResidentTexture {
             texture: Some(texture),
             handle,
+            sampler,
         })
     }
 
@@ -118,6 +123,8 @@ impl ResidentTexture {
 
         {
             let mut ctxt = texture.get_context().make_current();
+            self.sampler.destruct(&mut ctxt);
+            unsafe { assert_eq!(ctxt.gl.GetError(), gl::NO_ERROR) }; 
             unsafe { ctxt.gl.MakeTextureHandleNonResidentARB(self.handle) };
             ctxt.resident_texture_handles.retain(|&t| t != self.handle);
         }

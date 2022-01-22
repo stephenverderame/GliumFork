@@ -1025,8 +1025,8 @@ fn build_texture<W: Write>(dest: &mut W, ty: TextureType, dimensions: TextureDim
             ///
             /// See the documentation of `ResidentTexture` for more infos.
             #[inline]
-            pub fn resident(self) -> Result<ResidentTexture, BindlessTexturesNotSupportedError> {{
-                ResidentTexture::new(self.0)
+            pub fn resident(self, sb: &crate::uniforms::SamplerBehavior) -> Result<ResidentTexture, BindlessTexturesNotSupportedError> {{
+                ResidentTexture::new(self.0, sb)
             }}
         "#)).unwrap();
 

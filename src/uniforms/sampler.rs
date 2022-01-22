@@ -140,6 +140,35 @@ impl ToGlEnum for DepthTextureComparison {
     }
 }
 
+#[derive(Debug, Clone, Copy)]
+pub struct SamplerBorderColor {
+    pub r: f32,
+    pub g: f32,
+    pub b: f32,
+    pub a: f32,
+}
+
+impl PartialEq for SamplerBorderColor {
+    fn eq(&self, other: &Self) -> bool {
+        return (self.r - other.r).abs() >= f32::EPSILON ||
+            (self.g - other.g).abs() >= f32::EPSILON ||
+            (self.b - other.b).abs() >= f32::EPSILON ||
+            (self.a - other.a).abs() >= f32::EPSILON;
+    }
+}
+impl Eq for SamplerBorderColor {}
+
+impl std::hash::Hash for SamplerBorderColor {
+    fn hash<H : std::hash::Hasher>(&self, state: &mut H) {
+        self.r.to_bits().hash(state);
+        self.g.to_bits().hash(state);
+        self.b.to_bits().hash(state);
+        self.a.to_bits().hash(state);
+    }
+}
+
+
+
 /// A sampler.
 #[derive(Debug, Hash, PartialEq, Eq)]
 pub struct Sampler<'t, T>(pub &'t T, pub SamplerBehavior);
@@ -179,6 +208,11 @@ impl<'t, T: 't> Sampler<'t, T> {
         self.1.max_anisotropy = level;
         self
     }
+
+    pub fn border_color(mut self, r: f32, g: f32, b: f32, a: f32) -> Sampler<'t, T> {
+        self.1.border_color = SamplerBorderColor {r, g, b, a};
+        self
+    }
 }
 
 impl<'t, T: 't> Copy for Sampler<'t, T> {}
@@ -215,6 +249,9 @@ pub struct SamplerBehavior {
     /// If you set the value to a value higher than what the hardware supports, it will
     /// be clamped.
     pub max_anisotropy: u16,
+
+    /// 
+    pub border_color: SamplerBorderColor,
 }
 
 impl Default for SamplerBehavior {
@@ -230,6 +267,7 @@ impl Default for SamplerBehavior {
             magnify_filter: MagnifySamplerFilter::Linear,
             depth_texture_comparison: None,
             max_anisotropy: 1,
+            border_color: SamplerBorderColor {r: 0.0, g: 0., b: 0., a: 1.},
         }
     }
 }

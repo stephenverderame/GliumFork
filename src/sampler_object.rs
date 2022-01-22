@@ -40,6 +40,9 @@ impl SamplerObject {
                                       behavior.minify_filter.to_glenum() as gl::types::GLint);
             ctxt.gl.SamplerParameteri(sampler, gl::TEXTURE_MAG_FILTER,
                                       behavior.magnify_filter.to_glenum() as gl::types::GLint);
+            let bc = behavior.border_color;
+            let col = [bc.r, bc.g, bc.b, bc.a];
+            ctxt.gl.SamplerParameterfv(sampler, gl::TEXTURE_BORDER_COLOR, col.as_ptr());
 
             if let Some(dtc) = behavior.depth_texture_comparison {
                 ctxt.gl.SamplerParameteri(sampler, gl::TEXTURE_COMPARE_MODE,
@@ -68,6 +71,15 @@ impl SamplerObject {
     ///
     #[inline]
     pub fn destroy(mut self, ctxt: &mut CommandContext<'_>) {
+        self.destroyed = true;
+
+        unsafe {
+            ctxt.gl.DeleteSamplers(1, [self.id].as_ptr());
+        }
+    }
+
+    #[inline]
+    pub fn destruct(&mut self, ctxt: &mut CommandContext<'_>) {
         self.destroyed = true;
 
         unsafe {
