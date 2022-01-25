@@ -34,6 +34,132 @@ fn no_depth_buffer_depth_test() {
 }
 
 #[test]
+fn layered_framebuffer_test() {
+    use glium::framebuffer::{ToDepthAttachment, ToColorAttachment};
+    let display = support::build_display();
+
+    #[derive(Copy, Clone)]
+    struct Vertex {
+        pos: [f32; 2],
+    }
+    glium::implement_vertex!(Vertex, pos);
+
+    let vbo = glium::VertexBuffer::new(&display, &[
+        Vertex { pos: [-1.0,  1.0] }, Vertex { pos: [1.0,  1.0] },
+        Vertex { pos: [-1.0, -1.0] }, Vertex { pos: [1.0, -1.0] },
+    ]).unwrap();
+
+    let ebo = glium::IndexBuffer::new(&display, 
+        glium::index::PrimitiveType::TrianglesList, &[0u8, 2, 3, 1, 0, 3]).unwrap();
+
+    let program = glium::Program::from_source(&display,
+    r#"
+    #version 330 core
+    layout (location = 0) in vec2 pos;
+    void main() {
+        gl_Position = vec4(pos.x, pos.y, 0.0, 1.0);
+    }
+    "#,
+    r#"
+    #version 330 core
+    out vec4 frag_color;
+    void main() {
+        frag_color = vec4(1.0, 0.0, 0.0, 1.0);
+    }
+    "#,
+    Some(r#"
+    #version 330 core
+    layout (triangles) in;
+    layout (triangle_strip, max_vertices=18) out;
+    void main() {
+        for (int face = 0; face < 6; ++face) {
+            gl_Layer = face;
+            for (int vertex = 0; vertex < 3; ++vertex) {
+                gl_Position = gl_in[vertex].gl_Position;
+                EmitVertex();
+            }
+            EndPrimitive();
+        }
+    }
+    "#)).unwrap();
+
+    let color_buf = glium::texture::Cubemap::empty_with_format(&display,
+        glium::texture::UncompressedFloatFormat::U8U8U8U8,
+        glium::texture::MipmapsOption::NoMipmap,
+        128).unwrap();
+    let depth_buf = glium::texture::DepthCubemap::empty_with_format(&display,
+        glium::texture::DepthFormat::I24,
+        glium::texture::MipmapsOption::NoMipmap,
+        128).unwrap();
+
+    let mut framebuffer = glium::framebuffer::SimpleFrameBuffer::with_depth_buffer(&display, 
+        color_buf.main_level().to_color_attachment(),
+        depth_buf.main_level().to_depth_attachment()).unwrap();
+
+    let parameters = glium::DrawParameters {
+        depth: glium::Depth {
+            test: glium::DepthTest::IfLess,
+            .. Default::default()
+        },
+        .. Default::default()
+    };
+
+    framebuffer.clear_color_and_depth((0., 0., 0., 1.), 1.);
+    match framebuffer.draw(&vbo, &ebo, &program,
+                           &glium::uniforms::EmptyUniforms, &parameters)
+    {
+        Result::Ok(_) => (),
+        a => panic!("{:?}", a)
+    };
+
+    display.assert_no_error(None);
+
+    let dst_tex = glium::texture::Texture2d::empty_with_format(&display,
+        glium::texture::UncompressedFloatFormat::U8U8U8U8,
+        glium::texture::MipmapsOption::NoMipmap,
+        128, 128).unwrap();
+    let mut test_fbo = glium::framebuffer::SimpleFrameBuffer::new(&display, &dst_tex).unwrap();
+
+    let test_program = glium::Program::from_source(&display,
+        r#"
+        #version 330 core
+        layout (location = 0) in vec2 pos;
+        out vec2 tex_coords;
+        void main() {
+            tex_coords = (pos + vec2(1.0)) * 0.5;
+            gl_Position = vec4(pos.x, pos.y, 0.0, 1.0);
+        }
+        "#,
+        r#"
+        #version 330 core
+        in vec2 tex_coords;
+        out vec4 frag_color;
+        uniform samplerCube tex;
+        void main() {
+            frag_color = texture(tex, vec3(tex_coords.x, cos(tex_coords.y), tex_coords.y));
+        }
+        "#,
+        None).unwrap();
+    let tst_params = glium::DrawParameters::default();
+    let u = glium::uniform! {
+        tex: color_buf.sampled()
+    };
+    match test_fbo.draw(&vbo, &ebo, &test_program,
+                        &u, &tst_params)
+    {
+        Result::Ok(_) => (),
+        a => panic!("{:?}", a)
+    };
+
+    let read_back : Vec<Vec<(u8, u8, u8, u8)>> = dst_tex.read();
+    for i in 0 .. 128 {
+        for j in 0 .. 128 {
+            assert_eq!(read_back[i][j], (255, 0, 0, 255));
+        }
+    }
+}
+
+#[test]
 fn no_depth_buffer_depth_write() {
     let display = support::build_display();
     let (vertex_buffer, index_buffer, program) = support::build_fullscreen_red_pipeline(&display);

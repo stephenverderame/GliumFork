@@ -1391,6 +1391,16 @@ fn build_texture<W: Write>(dest: &mut W, ty: TextureType, dimensions: TextureDim
                             }}
                         }}
                     ", ty = attachment_type)).unwrap();
+                if dimensions.is_cube() || dimensions.is_array() {
+                    write!(dest, r#"
+                    impl<'t> crate::framebuffer::ToColorAttachment<'t> for {name}Mipmap<'t> {{
+                        #[inline]
+                        fn to_color_attachment(self) -> crate::framebuffer::ColorAttachment<'t> {{
+                            crate::framebuffer::ColorAttachment::LayeredTexture(*self)
+                        }}
+                    }}
+                    "#, name = name).unwrap();
+                }
             },
             TextureType::Depth => {
                 (writeln!(dest, "
@@ -1401,6 +1411,16 @@ fn build_texture<W: Write>(dest: &mut W, ty: TextureType, dimensions: TextureDim
                             }}
                         }}
                     ", ty = attachment_type)).unwrap();
+                if dimensions.is_cube() || dimensions.is_array() {
+                    write!(dest, r#"
+                    impl<'t> crate::framebuffer::ToDepthAttachment<'t> for {name}Mipmap<'t> {{
+                        #[inline]
+                        fn to_depth_attachment(self) -> crate::framebuffer::DepthAttachment<'t> {{
+                            crate::framebuffer::DepthAttachment::LayeredTexture(*self)
+                        }}
+                    }}
+                    "#, name = name).unwrap();
+                }
             },
             TextureType::Stencil => {
                 (writeln!(dest, "
@@ -1411,6 +1431,16 @@ fn build_texture<W: Write>(dest: &mut W, ty: TextureType, dimensions: TextureDim
                             }}
                         }}
                     ", ty = attachment_type)).unwrap();
+                if dimensions.is_cube() || dimensions.is_array() {
+                    write!(dest, r#"
+                    impl<'t> crate::framebuffer::ToStencilAttachment<'t> for {name}Mipmap<'t> {{
+                        #[inline]
+                        fn to_stencil_attachment(self) -> crate::framebuffer::StencilAttachment<'t> {{
+                            crate::framebuffer::StencilAttachment::LayeredTexture(*self)
+                        }}
+                    }}
+                    "#, name = name).unwrap();
+                }
             },
             TextureType::DepthStencil => {
                 (writeln!(dest, "
@@ -1421,11 +1451,20 @@ fn build_texture<W: Write>(dest: &mut W, ty: TextureType, dimensions: TextureDim
                             }}
                         }}
                     ", ty = attachment_type)).unwrap();
+                if dimensions.is_cube() || dimensions.is_array() {
+                    write!(dest, r#"
+                    impl<'t> crate::framebuffer::ToDepthStencilAttachment<'t> for {name}Mipmap<'t> {{
+                        #[inline]
+                        fn to_depth_stencil_attachment(self) -> crate::framebuffer::DepthStencilAttachment<'t> {{
+                            crate::framebuffer::DepthStencilAttachment::LayeredTexture(*self)
+                        }}
+                    }}
+                    "#, name = name).unwrap();
+                }
             },
             _ => ()
         }
     }
-
     // closing `mod module {`
     writeln!(dest, "}}").unwrap();
 }

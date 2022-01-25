@@ -103,6 +103,23 @@ pub enum FramebufferAttachments<'a> {
         fixed_samples: bool,
     },
 }
+#[derive(Copy, Clone)]
+pub enum Attachment<'a> {
+    /// A regular attachment
+    Regular(RegularAttachment<'a>),
+    /// A layered attachment
+    Layered(LayeredAttachment<'a>),
+}
+
+impl<'a> Attachment<'a> {
+    /// Determines if this attachment is a layered attachment
+    pub fn is_layered(&self) -> bool {
+        match self {
+            Attachment::Regular(_) => false,
+            Attachment::Layered(_) => true,
+        }
+    }
+}
 
 /// Describes a single non-layered framebuffer attachment.
 #[derive(Copy, Clone)]
@@ -126,7 +143,7 @@ impl<'a> RegularAttachment<'a> {
 
 /// Describes a single layered framebuffer attachment.
 #[derive(Copy, Clone)]
-pub struct LayeredAttachment<'a>(TextureAnyMipmap<'a>);
+pub struct LayeredAttachment<'a>(pub TextureAnyMipmap<'a>);
 
 /// Depth and/or stencil attachment to use.
 #[derive(Copy, Clone)]

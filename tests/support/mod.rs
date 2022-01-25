@@ -14,8 +14,10 @@ use std::env;
 /// Builds a display for tests.
 #[cfg(not(feature = "test_headless"))]
 pub fn build_display() -> glium::Display {
+    use glutin::platform::windows::EventLoopExtWindows;
     let version = parse_version();
-    let event_loop = glutin::event_loop::EventLoop::new();
+    let event_loop : glutin::event_loop::EventLoop<()>
+        = glutin::event_loop::EventLoop::new_any_thread();
     let wb = glutin::window::WindowBuilder::new().with_visible(false);
     let cb = glutin::ContextBuilder::new()
         .with_gl_debug_flag(true)
